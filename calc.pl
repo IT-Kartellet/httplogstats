@@ -229,103 +229,155 @@ barsContainer.append("line")
 </script>
 <script>
 function renderFrequencyChart(datasource, col) {
-  var margin = {top: 20, right: 20, bottom: 30, left: 40},
-      width = 960 - margin.left - margin.right,
-      height = 500 - margin.top - margin.bottom;
-   
-  var x = d3.scale.ordinal()
-      .rangeRoundBands([0, width], .1);
-   
-  var y = d3.scale.linear()
-      .rangeRound([height, 0]);
-   
-  var color = d3.scale.ordinal()
-  .range(
-  ['#39a43d', '#7dbd2f', '#b0ca28', '#d7bf20', '#e38e16', '#f04e0c', '#fc0000',
-  '#36344c', '#352f3f', '#2f2832', '#262026', '#191619', '#0d0c0c'
-  ]
-  );
-  
-  var xAxis = d3.svg.axis()
-      .scale(x)
-      .orient("bottom");
-   
-  var yAxis = d3.svg.axis()
-      .scale(y)
-      .orient("left")
-      .tickFormat(d3.format(".2s"));
-   
-  var svg = d3.select("#chart").append("svg")
-      .attr("width", width + margin.left + margin.right)
-      .attr("height", height + margin.top + margin.bottom)
-    .append("g")
-      .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
-  
-  var data = d3.csv.parse(d3.select('#' + datasource).text());
 
-  color.domain(d3.keys(data[0]).filter(function(key) { return key.indexOf("freq") == 0; }));
- 
-  data.forEach(function(d) {
-    var y0 = 0;
-    d.samples = color.domain().map(function(name) {
-      return {name: name, y0: y0, y1: y0 += +d[name]}; 
-    });
-    d.total = d.samples[d.samples.length - 1].y1;
-  });
- 
-  //data.sort(function(a, b) { return b.total - a.total; });
- 
-  x.domain(data.map(function(d) { return d.date; }));
-  y.domain([0, d3.max(data, function(d) { return d.total; })]);
- 
-  svg.append("g")
-      .attr("class", "x axis")
-      .attr("transform", "translate(0," + height + ")")
-      .call(xAxis);
- 
-  svg.append("g")
-      .attr("class", "y axis")
-      .call(yAxis)
-    .append("text")
-      .attr("transform", "rotate(-90)")
-      .attr("y", 6)
-      .attr("dy", ".71em")
-      .style("text-anchor", "end")
-      .text("Samples");
- 
-  var state = svg.selectAll(".state")
-      .data(data)
-    .enter().append("g")
-      .attr("class", "g")
-      .attr("transform", function(d) { return "translate(" + x(d.date) + ",0)"; });
- 
-  state.selectAll("rect")
-      .data(function(d) { return d.samples; })
-    .enter().append("rect")
-      .attr("width", x.rangeBand())
-      .attr("y", function(d) { return y(d.y1); })
-      .attr("height", function(d) { return y(d.y0) - y(d.y1); })
-      .style("fill", function(d) { return color(d.name); });
- 
-  var legend = svg.selectAll(".legend")
-      .data(color.domain().slice().reverse())
-    .enter().append("g")
-      .attr("class", "legend")
-      .attr("transform", function(d, i) { return "translate(0," + i * 20 + ")"; });
- 
-  legend.append("rect")
-      .attr("x", width - 18)
-      .attr("width", 18)
-      .attr("height", 18)
-      .style("fill", color);
- 
-  legend.append("text")
-      .attr("x", width - 24)
-      .attr("y", 9)
-      .attr("dy", ".35em")
-      .style("text-anchor", "end")
-      .text(function(d) { return d; });
- 
+
+
+	// load dataset from csv
+ 	var data = d3.csv.parse(d3.select('#' + datasource).text());
+
+	// get frequency bins
+	var bins = d3.keys(data[0]).filter(function(key) { return key.indexOf("freq") == 0; }).map(function(key){return key.replace("freq","");});
+
+	
+  	var color_range = ['#39a43d', '#7dbd2f', '#b0ca28', '#d7bf20', '#e38e16', '#f04e0c', '#fc0000',
+  		'#36344c', '#352f3f', '#2f2832', '#262026'];
+
+	max_count = 0;
+
+	// calculate cumulative frequencies
+	data.forEach(function(d,i){
+		cfreq = 0;
+		for(i in bins){
+			cfreq += (+d["freq" + bins[i]]);
+			d["cfreq"+bins[i]] = cfreq;
+		}
+		max_count = (+d.cnt > max_count) ? +d.cnt : max_count;
+	});
+
+
+	margin = {top:120,right:50,bottom:50,left:100};
+
+	chartWidth = Math.floor(window.innerWidth*0.90) + margin.right  ;//+margin.left;
+	barWidth = 20;
+
+	chartHeight = (barWidth+1)*(data.length+1) + margin.bottom + margin.top;	
+
+	// create chart
+	var chart = d3.select("#chart").append("svg")
+		.attr("width",chartWidth+"px")
+		.attr("height",(barWidth+1)*(data.length+1) + margin.bottom + margin.top + "px");
+
+	// bind data records to group elements
+	var bars = chart.selectAll("g").data(data);
+	barGroups = bars.enter().append("g");
+
+	
+	// calculate ticks interval
+	scale_order = Math.floor(Math.log(max_count)/Math.LN10);
+	interval = Math.pow(10,scale_order)/(5);
+
+	intervals = [];
+	for(i=0;i < max_count; i=i+interval){
+		intervals.push(i);
+	}
+
+	// create legend
+	var legend = d3.select("#chart svg").append("g")
+		.attr("width",bins.length * 100)
+		.attr("height",60)
+		.attr("x",margin.left)
+		.attr("y",10)
+		.attr("stroke","#555")
+		.attr("fill-opacity",0.0);
+
+	// add legend labels	
+	legendlabel_w = (chartWidth / color_range.length)/2;
+	legend.selectAll("rect").data(color_range).enter().append("rect")
+		.attr("x",function(d,i){return i * legendlabel_w  + margin.left ;})
+		.attr("y",10)
+		.attr("width",function(d,i){return  legendlabel_w-5;})
+		.attr("height",10)
+		.attr("fill",function(d){return d;})
+		.attr("fill-opacity",1.0);
+	legend.selectAll("text").data(bins).enter().append("text")
+		.text(function(d){
+			return d/1000 + "s";
+		})
+		.attr("x",function(d,i){return i * legendlabel_w  + margin.left + legendlabel_w/2 -14 ;})
+		.attr("y",40)
+		.attr("fill-opacity",1.0);
+
+	
+	// add lines and ticks
+	chart.append("line") // x-axis
+		.attr("x1",margin.left-10)
+		.attr("y1",margin.top)
+		.attr("x2",chartWidth + 10)
+		.attr("y2",margin.top)
+		.attr("stroke","black")
+		.attr("stroke-width",1);
+
+	//TODO: add x-axis label
+	
+
+
+	chart.append("line") // y-axis
+		.attr("x1",margin.left)
+		.attr("y1",margin.top -10)
+		.attr("x2",margin.left)
+		.attr("y2",chartHeight)
+		.attr("stroke","black")
+		.attr("stroke-width",1);
+	
+	x_scale_factor =(max_count/(chartWidth-margin.left));
+
+	for(i in intervals){
+		chart.append("line") // horizontal-lines
+			.attr("x1",margin.left + intervals[i]/x_scale_factor)
+			.attr("y1",margin.top -10)
+			.attr("x2",margin.left + intervals[i]/x_scale_factor)
+			.attr("y2",chartHeight)
+			.attr("stroke","#aaa")
+			.attr("stroke-width",1);
+
+		chart.append("text").text(d3.round(intervals[i],1))
+			.attr("x",margin.left + intervals[i]/x_scale_factor - 5)
+			.attr("y",margin.top -15);
+	}
+
+
+	// add date label to each bar
+	barGroups.append("text").text(function(d,i){return d.date;})
+		.attr("x",10)
+		.attr("y",function(d,i){return (barWidth+1)*(i+1)+ margin.top;})
+		.attr("font-size","16px");
+	
+	// draw bar segment for each frequency bin 
+	bins.forEach(function(freq,j){	
+		barGroups.append("rect")
+			.attr("x",function(d,i){
+				return ((d["cfreq"+freq]-d["freq"+freq])/max_count*(chartWidth-margin.left))+margin.left;
+			})
+			.attr("y",function(d,i){return (barWidth+1)*(i+1)-barWidth+5 + margin.top;})
+			.attr("width",function(d,i){
+				return ((d["freq"+freq])/max_count*(chartWidth-margin.left));
+			})
+			.attr("height",barWidth)
+			.attr("freq",function(d,i){return d["freq"+freq];})
+			.attr("cfreq",function(d,i){return d["cfreq"+freq];})
+			.attr("fill",color_range[j])//"hsl("+(100-j*25) +",70%,60%)")
+			.on("mouseover",render_summary)
+			.on("mouseout",hide_summary);
+	});
+
+	function render_summary(d,i){
+		//console.log(d.avg);
+	}
+
+	function hide_summary(d,i){
+		//console.log("leaving");
+	}
+
 }
 </script>
 |;
