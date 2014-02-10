@@ -242,6 +242,37 @@ function renderFrequencyChart(datasource, col) {
   	var color_range = ['#39a43d', '#7dbd2f', '#b0ca28', '#d7bf20', '#e38e16', '#f04e0c', '#fc0000',
   		'#36344c', '#352f3f', '#2f2832', '#262026'];
 
+	/*
+	var color_range = [
+				'#fff7ec',
+				'#fee8c8',
+				'#fdd49e',
+				'#fdbb84',
+				'#fc8d59',
+				'#ef6548',
+				'#d7301f',
+				'#b30000',
+				'#7f0000',
+				'#6f0000',
+				'#5f0000'];
+	*/
+
+	// this color scale might be more appropriate since 
+	// it is ordered by saturation/intensity instead of hue
+	/*var color_range = [	
+				'rgba(251,227,153,255)',
+				'rgba(247,205,137,255)',
+				'rgba(244,183,122,255)',
+				'rgba(240,161,107,255)',
+				'rgba(237,139,92,255)',
+				'rgba(233,118,77,255)',
+				'rgba(230,96,62,255)',
+				'rgba(226,74,47,255)',
+				'rgba(223,52,32,255)',
+				'rgba(219,30,17,255)',
+				'rgba(216,9,2,255)'];
+	*/
+
 	max_count = 0;
 
 	// calculate cumulative frequencies
@@ -290,6 +321,8 @@ function renderFrequencyChart(datasource, col) {
 		.attr("stroke","#555")
 		.attr("fill-opacity",0.0);
 
+	var grid = d3.select("#chart svg").append("g");
+
 	// add legend labels	
 	legendlabel_w = (chartWidth / color_range.length)/2;
 	legend.selectAll("rect").data(color_range).enter().append("rect")
@@ -309,11 +342,12 @@ function renderFrequencyChart(datasource, col) {
 
 	
 	// add lines and ticks
-	chart.append("line") // x-axis
+	grid.append("line") // x-axis
 		.attr("x1",margin.left-10)
 		.attr("y1",margin.top)
 		.attr("x2",chartWidth + 10)
 		.attr("y2",margin.top)
+		.attr("shape-rendering","crispEdges")
 		.attr("stroke","black")
 		.attr("stroke-width",1);
 
@@ -321,18 +355,20 @@ function renderFrequencyChart(datasource, col) {
 	
 
 
-	chart.append("line") // y-axis
+	grid.append("line") // y-axis
 		.attr("x1",margin.left)
 		.attr("y1",margin.top -10)
 		.attr("x2",margin.left)
 		.attr("y2",chartHeight)
+		.attr("shape-rendering","crispEdges")
 		.attr("stroke","black")
 		.attr("stroke-width",1);
 	
 	x_scale_factor =(max_count/(chartWidth-margin.left));
 
+	
 	for(i in intervals){
-		chart.append("line") // horizontal-lines
+		grid.append("line") // horizontal-lines
 			.attr("x1",margin.left + intervals[i]/x_scale_factor)
 			.attr("y1",margin.top -10)
 			.attr("x2",margin.left + intervals[i]/x_scale_factor)
@@ -340,7 +376,7 @@ function renderFrequencyChart(datasource, col) {
 			.attr("stroke","#aaa")
 			.attr("stroke-width",1);
 
-		chart.append("text").text(d3.round(intervals[i],1))
+		grid.append("text").text(d3.round(intervals[i],1))
 			.attr("x",margin.left + intervals[i]/x_scale_factor - 5)
 			.attr("y",margin.top -15);
 	}
@@ -366,12 +402,13 @@ function renderFrequencyChart(datasource, col) {
 			.attr("freq",function(d,i){return d["freq"+freq];})
 			.attr("cfreq",function(d,i){return d["cfreq"+freq];})
 			.attr("fill",color_range[j])//"hsl("+(100-j*25) +",70%,60%)")
-			.on("mouseover",render_summary)
+			.on("mouseover",function(){highlight_legend(j);})
 			.on("mouseout",hide_summary);
 	});
 
-	function render_summary(d,i){
-		//console.log(d.avg);
+	function highlight_legend(j){
+		colorboxes = legend.selectAll("rect")[0];
+		console.log(colorboxes[j].x = j);
 	}
 
 	function hide_summary(d,i){
